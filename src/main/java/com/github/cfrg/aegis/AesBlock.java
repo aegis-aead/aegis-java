@@ -174,7 +174,8 @@ class AesBlock implements Cloneable {
     private static final ThreadLocal<byte[]> bytesBuffer = ThreadLocal.withInitial(() -> new byte[16]);
 
     /**
-     * Convert block to byte array, using the provided buffer if not null to avoid allocation
+     * Convert block to byte array, using the provided buffer if not null to avoid
+     * allocation
      *
      * @param buffer Optional buffer to write into (must be at least 16 bytes)
      * @return Byte array containing block data
@@ -225,10 +226,11 @@ class AesBlock implements Cloneable {
     }
 
     /**
-     * XOR this block with another block, storing the result in the provided result block
+     * XOR this block with another block, storing the result in the provided result
+     * block
      * to avoid allocating a new object
      *
-     * @param other The block to XOR with this one
+     * @param other  The block to XOR with this one
      * @param result The block to store the result in
      * @return The result block for chaining
      */
@@ -254,7 +256,7 @@ class AesBlock implements Cloneable {
      * Perform a bitwise AND of this block with another block, storing the result
      * in the provided result block to avoid allocating a new object
      *
-     * @param other The block to AND with this one
+     * @param other  The block to AND with this one
      * @param result The block to store the result in
      * @return The result block for chaining
      */
@@ -313,11 +315,12 @@ class AesBlock implements Cloneable {
     }
 
     /**
-     * Encrypt this block using the given round key, storing the result in the provided result block
+     * Encrypt this block using the given round key, storing the result in the
+     * provided result block
      * to avoid allocating a new object
      *
      * @param round_key The round key to encrypt with
-     * @param result The block to store the result in
+     * @param result    The block to store the result in
      * @return The result block for chaining
      */
     public final AesBlock encryptInto(final AesBlock round_key, final AesBlock result) {
