@@ -6,6 +6,54 @@ import java.util.Arrays;
 
 /** Aegis128L is a class that implements the AEGIS-128L authenticated encryption algorithm. */
 public class Aegis128L {
+
+  private static final byte[] C0_BYTES = {
+    0x00,
+    0x01,
+    0x01,
+    0x02,
+    0x03,
+    0x05,
+    0x08,
+    0x0d,
+    0x15,
+    0x22,
+    0x37,
+    0x59,
+    (byte) 0x90,
+    (byte) 0xe9,
+    0x79,
+    0x62
+  };
+
+  private static final byte[] C1_BYTES = {
+    (byte) 0xdb,
+    0x3d,
+    0x18,
+    0x55,
+    0x6d,
+    (byte) 0xc2,
+    0x2f,
+    (byte) 0xf1,
+    0x20,
+    0x11,
+    0x31,
+    0x42,
+    0x73,
+    (byte) 0xb5,
+    0x28,
+    (byte) 0xdd
+  };
+
+  private static final AesBlock C0 = new AesBlock(C0_BYTES);
+  private static final AesBlock C1 = new AesBlock(C1_BYTES);
+
+  private final byte[] tempBuffer = new byte[32];
+  private final AesBlock tempBlock0 = new AesBlock(0, 0, 0, 0);
+  private final AesBlock tempBlock1 = new AesBlock(0, 0, 0, 0);
+  private final AesBlock tempBlock2 = new AesBlock(0, 0, 0, 0);
+  private final AesBlock tempBlock3 = new AesBlock(0, 0, 0, 0);
+
   /**
    * Generates a random 128-bit key using a secure random number generator.
    *
@@ -47,56 +95,17 @@ public class Aegis128L {
     }
     this.tag_length = tag_length;
 
-    final byte[] c0_bytes = {
-      0x00,
-      0x01,
-      0x01,
-      0x02,
-      0x03,
-      0x05,
-      0x08,
-      0x0d,
-      0x15,
-      0x22,
-      0x37,
-      0x59,
-      0x90 - 256,
-      0xe9 - 256,
-      0x79,
-      0x62
-    };
-    final byte[] c1_bytes = {
-      0xdb - 256,
-      0x3d,
-      0x18,
-      0x55,
-      0x6d,
-      0xc2 - 256,
-      0x2f,
-      0xf1 - 256,
-      0x20,
-      0x11,
-      0x31,
-      0x42,
-      0x73,
-      0xb5 - 256,
-      0x28,
-      0xdd - 256
-    };
-    final AesBlock c0 = new AesBlock(c0_bytes);
-    final AesBlock c1 = new AesBlock(c1_bytes);
-
     final AesBlock key_block = new AesBlock(key);
     final AesBlock nonce_block = new AesBlock(nonce);
     var s = this.state;
     s[0] = key_block.xor(nonce_block);
-    s[1] = new AesBlock(c1);
-    s[2] = new AesBlock(c0);
-    s[3] = new AesBlock(c1);
+    s[1] = new AesBlock(C1);
+    s[2] = new AesBlock(C0);
+    s[3] = new AesBlock(C1);
     s[4] = key_block.xor(nonce_block);
-    s[5] = key_block.xor(c0);
-    s[6] = key_block.xor(c1);
-    s[7] = key_block.xor(c0);
+    s[5] = key_block.xor(C0);
+    s[6] = key_block.xor(C1);
+    s[7] = key_block.xor(C0);
 
     for (int i = 0; i < 10; i++) {
       this.update(nonce_block, key_block);
@@ -118,12 +127,10 @@ public class Aegis128L {
         this.absorb(Arrays.copyOfRange(ad, i, i + 32));
       }
       if (ad.length % 32 != 0) {
-        var pad = new byte[32];
-        Arrays.fill(pad, (byte) 0);
-        for (var j = 0; j < ad.length % 32; j++) {
-          pad[j] = ad[i + j];
-        }
-        this.absorb(pad);
+        Arrays.fill(tempBuffer, (byte) 0);
+        var remaining = ad.length % 32;
+        System.arraycopy(ad, i, tempBuffer, 0, remaining);
+        this.absorb(tempBuffer);
       }
     }
     if (msg != null) {
@@ -133,13 +140,11 @@ public class Aegis128L {
         System.arraycopy(ci, 0, ciphertext, i, 32);
       }
       if (msg.length % 32 != 0) {
-        var pad = new byte[32];
-        Arrays.fill(pad, (byte) 0);
-        for (var j = 0; j < msg.length % 32; j++) {
-          pad[j] = msg[i + j];
-        }
-        var ci = this.enc(pad);
-        System.arraycopy(ci, 0, ciphertext, i, msg.length % 32);
+        Arrays.fill(tempBuffer, (byte) 0);
+        var remaining = msg.length % 32;
+        System.arraycopy(msg, i, tempBuffer, 0, remaining);
+        var ci = this.enc(tempBuffer);
+        System.arraycopy(ci, 0, ciphertext, i, remaining);
       }
     }
     final var tag = this.mac(ad == null ? 0 : ad.length, msg == null ? 0 : msg.length);
@@ -178,12 +183,10 @@ public class Aegis128L {
         this.absorb(Arrays.copyOfRange(ad, i, i + 32));
       }
       if (ad.length % 32 != 0) {
-        var pad = new byte[32];
-        Arrays.fill(pad, (byte) 0);
-        for (var j = 0; j < ad.length % 32; j++) {
-          pad[j] = ad[i + j];
-        }
-        this.absorb(pad);
+        Arrays.fill(tempBuffer, (byte) 0);
+        var remaining = ad.length % 32;
+        System.arraycopy(ad, i, tempBuffer, 0, remaining);
+        this.absorb(tempBuffer);
       }
     }
     var msg = new byte[ac.ct.length];

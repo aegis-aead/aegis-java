@@ -307,6 +307,65 @@ class AesBlock implements Cloneable {
     return new AesBlock(this.a & other.a, this.b & other.b, this.c & other.c, this.d & other.d);
   }
 
+  public final void xorInPlace(final AesBlock other) {
+    this.a ^= other.a;
+    this.b ^= other.b;
+    this.c ^= other.c;
+    this.d ^= other.d;
+  }
+
+  public final void andInPlace(final AesBlock other) {
+    this.a &= other.a;
+    this.b &= other.b;
+    this.c &= other.c;
+    this.d &= other.d;
+  }
+
+  public final void copyFrom(final AesBlock other) {
+    this.a = other.a;
+    this.b = other.b;
+    this.c = other.c;
+    this.d = other.d;
+  }
+
+  public final void encryptInPlace(final AesBlock round_key) {
+    final var s0 = this.a;
+    final var s1 = this.b;
+    final var s2 = this.c;
+    final var s3 = this.d;
+
+    int x0, x1, x2, x3;
+
+    x0 = AesBlock.LUT0[(s0 >> 0) & 0xff];
+    x1 = AesBlock.LUT1[(s1 >> 8) & 0xff];
+    x2 = AesBlock.LUT2[(s2 >> 16) & 0xff];
+    x3 = AesBlock.LUT3[(s3 >> 24) & 0xff];
+    int t0 = x0 ^ x1 ^ x2 ^ x3;
+
+    x0 = AesBlock.LUT0[(s1 >> 0) & 0xff];
+    x1 = AesBlock.LUT1[(s2 >> 8) & 0xff];
+    x2 = AesBlock.LUT2[(s3 >> 16) & 0xff];
+    x3 = AesBlock.LUT3[(s0 >> 24) & 0xff];
+    int t1 = x0 ^ x1 ^ x2 ^ x3;
+
+    x0 = AesBlock.LUT0[(s2 >> 0) & 0xff];
+    x1 = AesBlock.LUT1[(s3 >> 8) & 0xff];
+    x2 = AesBlock.LUT2[(s0 >> 16) & 0xff];
+    x3 = AesBlock.LUT3[(s1 >> 24) & 0xff];
+    int t2 = x0 ^ x1 ^ x2 ^ x3;
+
+    x0 = AesBlock.LUT0[(s3 >> 0) & 0xff];
+    x1 = AesBlock.LUT1[(s0 >> 8) & 0xff];
+    x2 = AesBlock.LUT2[(s1 >> 16) & 0xff];
+    x3 = AesBlock.LUT3[(s2 >> 24) & 0xff];
+    int t3 = x0 ^ x1 ^ x2 ^ x3;
+
+    this.a = t0 ^ round_key.a;
+    this.b = t1 ^ round_key.b;
+    this.c = t2 ^ round_key.c;
+    this.d = t3 ^ round_key.d;
+  }
+
   public final AesBlock encrypt(final AesBlock round_key) {
     final var s0 = this.a;
     final var s1 = this.b;
