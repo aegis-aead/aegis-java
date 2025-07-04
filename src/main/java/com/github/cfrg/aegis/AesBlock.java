@@ -170,17 +170,8 @@ class AesBlock implements Cloneable {
         this.d = d;
     }
 
-    // Thread-local buffer to avoid allocations in toBytes() method
-    private static final ThreadLocal<byte[]> bytesBuffer = ThreadLocal.withInitial(() -> new byte[16]);
-
-    /**
-     * Convert block to byte array, using the provided buffer if not null to avoid allocation
-     *
-     * @param buffer Optional buffer to write into (must be at least 16 bytes)
-     * @return Byte array containing block data
-     */
-    public final byte[] toBytes(byte[] buffer) {
-        byte[] bytes = buffer != null ? buffer : new byte[16];
+    public final byte[] toBytes() {
+        var bytes = new byte[16];
 
         bytes[0 * 4 + 0] = (byte) (this.a >> 0);
         bytes[0 * 4 + 1] = (byte) (this.a >> 8);
@@ -205,73 +196,26 @@ class AesBlock implements Cloneable {
         return bytes;
     }
 
-    /**
-     * Convert block to byte array using thread-local buffer to avoid allocation
-     *
-     * @return Byte array containing block data
-     */
-    public final byte[] toBytes() {
-        return toBytes(bytesBuffer.get());
-    }
-
-    /**
-     * Create a new AesBlock as the XOR of this block and another
-     *
-     * @param other The block to XOR with this one
-     * @return A new AesBlock that is the XOR of this and other
-     */
     public final AesBlock xor(final AesBlock other) {
-        return new AesBlock(this.a ^ other.a, this.b ^ other.b, this.c ^ other.c, this.d ^ other.d);
+        var res = new AesBlock(this);
+        res.a ^= other.a;
+        res.b ^= other.b;
+        res.c ^= other.c;
+        res.d ^= other.d;
+
+        return res;
     }
 
-    /**
-     * XOR this block with another block, storing the result in the provided result block
-     * to avoid allocating a new object
-     *
-     * @param other The block to XOR with this one
-     * @param result The block to store the result in
-     * @return The result block for chaining
-     */
-    public final AesBlock xorInto(final AesBlock other, final AesBlock result) {
-        result.a = this.a ^ other.a;
-        result.b = this.b ^ other.b;
-        result.c = this.c ^ other.c;
-        result.d = this.d ^ other.d;
-        return result;
+    public final AesBlock and(AesBlock other) {
+        var res = new AesBlock(this);
+        res.a &= other.a;
+        res.b &= other.b;
+        res.c &= other.c;
+        res.d &= other.d;
+
+        return res;
     }
 
-    /**
-     * Create a new AesBlock as the bitwise AND of this block and another
-     *
-     * @param other The block to AND with this one
-     * @return A new AesBlock that is the AND of this and other
-     */
-    public final AesBlock and(final AesBlock other) {
-        return new AesBlock(this.a & other.a, this.b & other.b, this.c & other.c, this.d & other.d);
-    }
-
-    /**
-     * Perform a bitwise AND of this block with another block, storing the result
-     * in the provided result block to avoid allocating a new object
-     *
-     * @param other The block to AND with this one
-     * @param result The block to store the result in
-     * @return The result block for chaining
-     */
-    public final AesBlock andInto(final AesBlock other, final AesBlock result) {
-        result.a = this.a & other.a;
-        result.b = this.b & other.b;
-        result.c = this.c & other.c;
-        result.d = this.d & other.d;
-        return result;
-    }
-
-    /**
-     * Encrypt this block using the given round key and return a new block
-     *
-     * @param round_key The round key to encrypt with
-     * @return A new AesBlock containing the encrypted result
-     */
     public final AesBlock encrypt(final AesBlock round_key) {
         final var s0 = this.a;
         final var s1 = this.b;
@@ -310,49 +254,6 @@ class AesBlock implements Cloneable {
         t3 ^= round_key.d;
 
         return new AesBlock(t0, t1, t2, t3);
-    }
-
-    /**
-     * Encrypt this block using the given round key, storing the result in the provided result block
-     * to avoid allocating a new object
-     *
-     * @param round_key The round key to encrypt with
-     * @param result The block to store the result in
-     * @return The result block for chaining
-     */
-    public final AesBlock encryptInto(final AesBlock round_key, final AesBlock result) {
-        final var s0 = this.a;
-        final var s1 = this.b;
-        final var s2 = this.c;
-        final var s3 = this.d;
-
-        int x0, x1, x2, x3;
-
-        x0 = AesBlock.LUT0[(s0 >> 0) & 0xff];
-        x1 = AesBlock.LUT1[(s1 >> 8) & 0xff];
-        x2 = AesBlock.LUT2[(s2 >> 16) & 0xff];
-        x3 = AesBlock.LUT3[(s3 >> 24) & 0xff];
-        result.a = x0 ^ x1 ^ x2 ^ x3 ^ round_key.a;
-
-        x0 = AesBlock.LUT0[(s1 >> 0) & 0xff];
-        x1 = AesBlock.LUT1[(s2 >> 8) & 0xff];
-        x2 = AesBlock.LUT2[(s3 >> 16) & 0xff];
-        x3 = AesBlock.LUT3[(s0 >> 24) & 0xff];
-        result.b = x0 ^ x1 ^ x2 ^ x3 ^ round_key.b;
-
-        x0 = AesBlock.LUT0[(s2 >> 0) & 0xff];
-        x1 = AesBlock.LUT1[(s3 >> 8) & 0xff];
-        x2 = AesBlock.LUT2[(s0 >> 16) & 0xff];
-        x3 = AesBlock.LUT3[(s1 >> 24) & 0xff];
-        result.c = x0 ^ x1 ^ x2 ^ x3 ^ round_key.c;
-
-        x0 = AesBlock.LUT0[(s3 >> 0) & 0xff];
-        x1 = AesBlock.LUT1[(s0 >> 8) & 0xff];
-        x2 = AesBlock.LUT2[(s1 >> 16) & 0xff];
-        x3 = AesBlock.LUT3[(s2 >> 24) & 0xff];
-        result.d = x0 ^ x1 ^ x2 ^ x3 ^ round_key.d;
-
-        return result;
     }
 
     @Override

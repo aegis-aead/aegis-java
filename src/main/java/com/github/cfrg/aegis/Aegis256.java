@@ -185,283 +185,118 @@ public class Aegis256 {
         return "Aegis256 [state=" + Arrays.toString(state) + ", tag_length=" + tag_length + "]";
     }
 
-    // Reusable temporary block to avoid allocations in update method
-    private final AesBlock tmpBlock = new AesBlock(0, 0, 0, 0);
-
     protected void update(final AesBlock m) {
         var s = this.state;
+        final var tmp = new AesBlock(s[5]);
+        s[5] = s[4].encrypt(s[5]);
+        s[4] = s[3].encrypt(s[4]);
+        s[3] = s[2].encrypt(s[3]);
+        s[2] = s[1].encrypt(s[2]);
+        s[1] = s[0].encrypt(s[1]);
+        s[0] = tmp.encrypt(s[0]);
 
-        // Save s[5] to temporary block
-        tmpBlock.a = s[5].a;
-        tmpBlock.b = s[5].b;
-        tmpBlock.c = s[5].c;
-        tmpBlock.d = s[5].d;
-
-        // Perform state update using non-allocating methods
-        s[4].encryptInto(s[5], s[5]);
-        s[3].encryptInto(s[4], s[4]);
-        s[2].encryptInto(s[3], s[3]);
-        s[1].encryptInto(s[2], s[2]);
-        s[0].encryptInto(s[1], s[1]);
-        tmpBlock.encryptInto(s[0], s[0]);
-
-        // Apply message mixing
-        m.xorInto(s[0], s[0]);
+        s[0] = s[0].xor(m);
     }
-
-    // Reusable objects for absorb method
-    private final byte[] absorbBuffer = new byte[16];
-    private final AesBlock absorbBlock = new AesBlock(0, 0, 0, 0);
 
     protected void absorb(byte[] ai) {
         assert ai.length == 16;
-
-        // Copy data into reusable buffer
-        System.arraycopy(ai, 0, absorbBuffer, 0, 16);
-
-        // Load data into reusable AesBlock object
-        absorbBlock.a = ((absorbBuffer[0 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[0 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[0 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[0 * 4 + 3] & 0xff) << 24);
-        absorbBlock.b = ((absorbBuffer[1 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[1 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[1 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[1 * 4 + 3] & 0xff) << 24);
-        absorbBlock.c = ((absorbBuffer[2 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[2 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[2 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[2 * 4 + 3] & 0xff) << 24);
-        absorbBlock.d = ((absorbBuffer[3 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[3 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[3 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[3 * 4 + 3] & 0xff) << 24);
-
-        this.update(absorbBlock);
+        final var t = new AesBlock(ai);
+        this.update(t);
     }
-
-    // Reusable objects for enc method
-    private final AesBlock encZ = new AesBlock(0, 0, 0, 0);
-    private final AesBlock encT = new AesBlock(0, 0, 0, 0);
-    private final AesBlock encTmp = new AesBlock(0, 0, 0, 0);
-    private final byte[] encBuffer = new byte[16];
 
     protected byte[] enc(byte[] xi) {
         assert xi.length == 16;
         var s = this.state;
-
-        // Compute z = s[1] ⊕ s[4] ⊕ s[5] ⊕ (s[2] & s[3]) without allocations
-        s[2].andInto(s[3], encTmp);
-        s[1].xorInto(s[4], encZ);
-        s[5].xorInto(encZ, encZ);
-        encTmp.xorInto(encZ, encZ);
-
-        // Load input into t without array copying
-        System.arraycopy(xi, 0, absorbBuffer, 0, 16);
-
-        encT.a = ((absorbBuffer[0 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[0 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[0 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[0 * 4 + 3] & 0xff) << 24);
-        encT.b = ((absorbBuffer[1 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[1 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[1 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[1 * 4 + 3] & 0xff) << 24);
-        encT.c = ((absorbBuffer[2 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[2 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[2 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[2 * 4 + 3] & 0xff) << 24);
-        encT.d = ((absorbBuffer[3 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[3 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[3 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[3 * 4 + 3] & 0xff) << 24);
-
-        // XOR and convert to bytes without allocations
-        encT.xorInto(encZ, encTmp);
-        encTmp.toBytes(encBuffer);
-
-        // Update state
-        this.update(encT);
-
-        return encBuffer;
+        final var z = s[1].xor(s[4]).xor(s[5]).xor(s[2].and(s[3]));
+        final var t = new AesBlock(xi);
+        final var ci = t.xor(z).toBytes();
+        this.update(t);
+        return ci;
     }
-
-    // Reusable objects for dec method
-    private final AesBlock decZ = new AesBlock(0, 0, 0, 0);
-    private final AesBlock decT = new AesBlock(0, 0, 0, 0);
-    private final AesBlock decOut = new AesBlock(0, 0, 0, 0);
-    private final AesBlock decTmp = new AesBlock(0, 0, 0, 0);
-    private final byte[] decBuffer = new byte[16];
 
     protected byte[] dec(byte[] ci) {
         assert ci.length == 16;
         var s = this.state;
-
-        // Compute z = s[1] ⊕ s[4] ⊕ s[5] ⊕ (s[2] & s[3]) without allocations
-        s[2].andInto(s[3], decTmp);
-        s[1].xorInto(s[4], decZ);
-        s[5].xorInto(decZ, decZ);
-        decTmp.xorInto(decZ, decZ);
-
-        // Load input without array copying
-        System.arraycopy(ci, 0, absorbBuffer, 0, 16);
-
-        decT.a = ((absorbBuffer[0 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[0 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[0 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[0 * 4 + 3] & 0xff) << 24);
-        decT.b = ((absorbBuffer[1 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[1 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[1 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[1 * 4 + 3] & 0xff) << 24);
-        decT.c = ((absorbBuffer[2 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[2 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[2 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[2 * 4 + 3] & 0xff) << 24);
-        decT.d = ((absorbBuffer[3 * 4 + 0] & 0xff) << 0) | ((absorbBuffer[3 * 4 + 1] & 0xff) << 8)
-                | ((absorbBuffer[3 * 4 + 2] & 0xff) << 16) | ((absorbBuffer[3 * 4 + 3] & 0xff) << 24);
-
-        // XOR to get plaintext
-        decT.xorInto(decZ, decOut);
-
-        // Update state
-        this.update(decOut);
-
-        // Convert to bytes without allocation
-        decOut.toBytes(decBuffer);
-
-        return decBuffer;
+        final var z = s[1].xor(s[4]).xor(s[5]).xor(s[2].and(s[3]));
+        final var t = new AesBlock(ci);
+        final var out = t.xor(z);
+        this.update(out);
+        return out.toBytes();
     }
-
-    // Reusable objects for decLast method
-    private final AesBlock decLastZ = new AesBlock(0, 0, 0, 0);
-    private final AesBlock decLastT = new AesBlock(0, 0, 0, 0);
-    private final AesBlock decLastV = new AesBlock(0, 0, 0, 0);
-    private final AesBlock decLastTmp = new AesBlock(0, 0, 0, 0);
-    private final byte[] decLastPad = new byte[16];
-    private final byte[] decLastOutBytes = new byte[16];
 
     protected byte[] decLast(byte cn[]) {
         assert cn.length <= 16;
         var s = this.state;
-
-        // Compute z = s[1] ⊕ s[4] ⊕ s[5] ⊕ (s[2] & s[3]) without allocations
-        s[2].andInto(s[3], decLastTmp);
-        s[1].xorInto(s[4], decLastZ);
-        s[5].xorInto(decLastZ, decLastZ);
-        decLastTmp.xorInto(decLastZ, decLastZ);
-
-        // Clear padding buffer and copy in ciphertext
-        Arrays.fill(decLastPad, (byte) 0);
-        System.arraycopy(cn, 0, decLastPad, 0, cn.length);
-
-        // Load block for decryption
-        decLastT.a = ((decLastPad[0 * 4 + 0] & 0xff) << 0) | ((decLastPad[0 * 4 + 1] & 0xff) << 8)
-                | ((decLastPad[0 * 4 + 2] & 0xff) << 16) | ((decLastPad[0 * 4 + 3] & 0xff) << 24);
-        decLastT.b = ((decLastPad[1 * 4 + 0] & 0xff) << 0) | ((decLastPad[1 * 4 + 1] & 0xff) << 8)
-                | ((decLastPad[1 * 4 + 2] & 0xff) << 16) | ((decLastPad[1 * 4 + 3] & 0xff) << 24);
-        decLastT.c = ((decLastPad[2 * 4 + 0] & 0xff) << 0) | ((decLastPad[2 * 4 + 1] & 0xff) << 8)
-                | ((decLastPad[2 * 4 + 2] & 0xff) << 16) | ((decLastPad[2 * 4 + 3] & 0xff) << 24);
-        decLastT.d = ((decLastPad[3 * 4 + 0] & 0xff) << 0) | ((decLastPad[3 * 4 + 1] & 0xff) << 8)
-                | ((decLastPad[3 * 4 + 2] & 0xff) << 16) | ((decLastPad[3 * 4 + 3] & 0xff) << 24);
-
-        // XOR with keystream and convert to bytes
-        decLastT.xorInto(decLastZ, decLastTmp);
-        decLastTmp.toBytes(decLastOutBytes);
-
-        // Copy bytes to padding buffer
-        System.arraycopy(decLastOutBytes, 0, decLastPad, 0, 16);
-
-        // Extract plaintext of the right length
-        var xn = new byte[cn.length];
-        System.arraycopy(decLastPad, 0, xn, 0, cn.length);
-
-        // Zero out parts after ciphertext length
-        for (var i = cn.length; i < 16; i++) {
-            decLastPad[i] = 0;
+        final var z = s[1].xor(s[4]).xor(s[5]).xor(s[2].and(s[3]));
+        var pad = new byte[16];
+        Arrays.fill(pad, (byte) 0);
+        for (var i = 0; i < cn.length; i++) {
+            pad[i] = cn[i];
         }
-
-        // Load block for state update
-        decLastV.a = ((decLastPad[0 * 4 + 0] & 0xff) << 0) | ((decLastPad[0 * 4 + 1] & 0xff) << 8)
-                | ((decLastPad[0 * 4 + 2] & 0xff) << 16) | ((decLastPad[0 * 4 + 3] & 0xff) << 24);
-        decLastV.b = ((decLastPad[1 * 4 + 0] & 0xff) << 0) | ((decLastPad[1 * 4 + 1] & 0xff) << 8)
-                | ((decLastPad[1 * 4 + 2] & 0xff) << 16) | ((decLastPad[1 * 4 + 3] & 0xff) << 24);
-        decLastV.c = ((decLastPad[2 * 4 + 0] & 0xff) << 0) | ((decLastPad[2 * 4 + 1] & 0xff) << 8)
-                | ((decLastPad[2 * 4 + 2] & 0xff) << 16) | ((decLastPad[2 * 4 + 3] & 0xff) << 24);
-        decLastV.d = ((decLastPad[3 * 4 + 0] & 0xff) << 0) | ((decLastPad[3 * 4 + 1] & 0xff) << 8)
-                | ((decLastPad[3 * 4 + 2] & 0xff) << 16) | ((decLastPad[3 * 4 + 3] & 0xff) << 24);
-
-        // Update state
-        this.update(decLastV);
+        final var t = new AesBlock(pad);
+        final var out_bytes = t.xor(z).toBytes();
+        for (var i = 0; i < 16; i++) {
+            pad[i] = out_bytes[i];
+        }
+        var xn = new byte[cn.length];
+        for (var i = 0; i < cn.length; i++) {
+            xn[i] = pad[i];
+        }
+        for (var i = cn.length; i < 16; i++) {
+            pad[i] = 0;
+        }
+        final var v = new AesBlock(pad);
+        this.update(v);
 
         return xn;
     }
 
-    // Reusable objects for mac method
-    private final byte[] macLengthBytes = new byte[16];
-    private final AesBlock macLengthBlock = new AesBlock(0, 0, 0, 0);
-    private final AesBlock macT = new AesBlock(0, 0, 0, 0);
-    private final AesBlock macResult = new AesBlock(0, 0, 0, 0);
-    private final AesBlock macTmp = new AesBlock(0, 0, 0, 0);
-    private final byte[] macTag16 = new byte[16];
-    private final byte[] macTag32 = new byte[32];
-    private final byte[] macT0Bytes = new byte[16];
-    private final byte[] macT1Bytes = new byte[16];
-
     protected byte[] mac(final int ad_len_bytes, final int msg_len_bytes) {
         var s = this.state;
+        var bytes = new byte[16];
 
-        // Encode lengths in bytes
         final long ad_len = (long) ad_len_bytes * 8;
         final long msg_len = (long) msg_len_bytes * 8;
 
-        macLengthBytes[0 * 8 + 0] = (byte) (ad_len >> 0);
-        macLengthBytes[0 * 8 + 1] = (byte) (ad_len >> 8);
-        macLengthBytes[0 * 8 + 2] = (byte) (ad_len >> 16);
-        macLengthBytes[0 * 8 + 3] = (byte) (ad_len >> 24);
-        macLengthBytes[0 * 8 + 4] = (byte) (ad_len >> 32);
-        macLengthBytes[0 * 8 + 5] = (byte) (ad_len >> 40);
-        macLengthBytes[0 * 8 + 6] = (byte) (ad_len >> 48);
-        macLengthBytes[0 * 8 + 7] = (byte) (ad_len >> 56);
+        bytes[0 * 8 + 0] = (byte) (ad_len >> 0);
+        bytes[0 * 8 + 1] = (byte) (ad_len >> 8);
+        bytes[0 * 8 + 2] = (byte) (ad_len >> 16);
+        bytes[0 * 8 + 3] = (byte) (ad_len >> 24);
+        bytes[0 * 8 + 4] = (byte) (ad_len >> 32);
+        bytes[0 * 8 + 5] = (byte) (ad_len >> 40);
+        bytes[0 * 8 + 6] = (byte) (ad_len >> 48);
+        bytes[0 * 8 + 7] = (byte) (ad_len >> 56);
 
-        macLengthBytes[1 * 8 + 0] = (byte) (msg_len >> 0);
-        macLengthBytes[1 * 8 + 1] = (byte) (msg_len >> 8);
-        macLengthBytes[1 * 8 + 2] = (byte) (msg_len >> 16);
-        macLengthBytes[1 * 8 + 3] = (byte) (msg_len >> 24);
-        macLengthBytes[1 * 8 + 4] = (byte) (msg_len >> 32);
-        macLengthBytes[1 * 8 + 5] = (byte) (msg_len >> 40);
-        macLengthBytes[1 * 8 + 6] = (byte) (msg_len >> 48);
-        macLengthBytes[1 * 8 + 7] = (byte) (msg_len >> 56);
+        bytes[1 * 8 + 0] = (byte) (msg_len >> 0);
+        bytes[1 * 8 + 1] = (byte) (msg_len >> 8);
+        bytes[1 * 8 + 2] = (byte) (msg_len >> 16);
+        bytes[1 * 8 + 3] = (byte) (msg_len >> 24);
+        bytes[1 * 8 + 4] = (byte) (msg_len >> 32);
+        bytes[1 * 8 + 5] = (byte) (msg_len >> 40);
+        bytes[1 * 8 + 6] = (byte) (msg_len >> 48);
+        bytes[1 * 8 + 7] = (byte) (msg_len >> 56);
 
-        // Load length into block
-        macLengthBlock.a = ((macLengthBytes[0 * 4 + 0] & 0xff) << 0) | ((macLengthBytes[0 * 4 + 1] & 0xff) << 8)
-                | ((macLengthBytes[0 * 4 + 2] & 0xff) << 16) | ((macLengthBytes[0 * 4 + 3] & 0xff) << 24);
-        macLengthBlock.b = ((macLengthBytes[1 * 4 + 0] & 0xff) << 0) | ((macLengthBytes[1 * 4 + 1] & 0xff) << 8)
-                | ((macLengthBytes[1 * 4 + 2] & 0xff) << 16) | ((macLengthBytes[1 * 4 + 3] & 0xff) << 24);
-        macLengthBlock.c = ((macLengthBytes[2 * 4 + 0] & 0xff) << 0) | ((macLengthBytes[2 * 4 + 1] & 0xff) << 8)
-                | ((macLengthBytes[2 * 4 + 2] & 0xff) << 16) | ((macLengthBytes[2 * 4 + 3] & 0xff) << 24);
-        macLengthBlock.d = ((macLengthBytes[3 * 4 + 0] & 0xff) << 0) | ((macLengthBytes[3 * 4 + 1] & 0xff) << 8)
-                | ((macLengthBytes[3 * 4 + 2] & 0xff) << 16) | ((macLengthBytes[3 * 4 + 3] & 0xff) << 24);
-
-        // XOR s[3] with length block
-        s[3].xorInto(macLengthBlock, macT);
-
-        // Run state updates
+        final var t = s[3].xor(new AesBlock(bytes));
         for (var i = 0; i < 7; i++) {
-            this.update(macT);
+            this.update(t);
         }
 
         if (this.tag_length == 16) {
-            // Compute s[0] ⊕ s[1] ⊕ s[2] ⊕ s[3] ⊕ s[4] ⊕ s[5] without allocations
-            s[0].xorInto(s[1], macResult);
-            s[2].xorInto(macResult, macResult);
-            s[3].xorInto(macResult, macResult);
-            s[4].xorInto(macResult, macResult);
-            s[5].xorInto(macResult, macResult);
-
-            // Convert to bytes without allocation
-            macResult.toBytes(macTag16);
-
-            this.state = null;
-            return macTag16;
+            return s[0].xor(s[1]).xor(s[2]).xor(s[3]).xor(s[4]).xor(s[5]).toBytes();
         }
-
         assert this.tag_length == 32;
-
-        // Compute s[0] ⊕ s[1] ⊕ s[2] without allocations
-        s[0].xorInto(s[1], macResult);
-        s[2].xorInto(macResult, macResult);
-        macResult.toBytes(macT0Bytes);
-
-        // Compute s[3] ⊕ s[4] ⊕ s[5] without allocations
-        s[3].xorInto(s[4], macTmp);
-        s[5].xorInto(macTmp, macTmp);
-        macTmp.toBytes(macT1Bytes);
-
-        // Combine results
-        System.arraycopy(macT0Bytes, 0, macTag32, 0, 16);
-        System.arraycopy(macT1Bytes, 0, macTag32, 16, 16);
+        var tag = new byte[32];
+        final var t0 = s[0].xor(s[1]).xor(s[2]).toBytes();
+        final var t1 = s[3].xor(s[4]).xor(s[5]).toBytes();
+        for (var i = 0; i < 16; i++) {
+            tag[i] = t0[i];
+        }
+        for (var i = 0; i < 16; i++) {
+            tag[16 + i] = t1[i];
+        }
 
         this.state = null;
 
-        return macTag32;
+        return tag;
     }
 }
