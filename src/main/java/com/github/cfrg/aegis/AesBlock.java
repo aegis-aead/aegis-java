@@ -291,49 +291,20 @@ class AesBlock implements Cloneable {
   }
 
   public final byte[] toBytes() {
-    var bytes = new byte[16];
-
-    bytes[0 * 4 + 0] = (byte) (this.a >> 0);
-    bytes[0 * 4 + 1] = (byte) (this.a >> 8);
-    bytes[0 * 4 + 2] = (byte) (this.a >> 16);
-    bytes[0 * 4 + 3] = (byte) (this.a >> 24);
-
-    bytes[1 * 4 + 0] = (byte) (this.b >> 0);
-    bytes[1 * 4 + 1] = (byte) (this.b >> 8);
-    bytes[1 * 4 + 2] = (byte) (this.b >> 16);
-    bytes[1 * 4 + 3] = (byte) (this.b >> 24);
-
-    bytes[2 * 4 + 0] = (byte) (this.c >> 0);
-    bytes[2 * 4 + 1] = (byte) (this.c >> 8);
-    bytes[2 * 4 + 2] = (byte) (this.c >> 16);
-    bytes[2 * 4 + 3] = (byte) (this.c >> 24);
-
-    bytes[3 * 4 + 0] = (byte) (this.d >> 0);
-    bytes[3 * 4 + 1] = (byte) (this.d >> 8);
-    bytes[3 * 4 + 2] = (byte) (this.d >> 16);
-    bytes[3 * 4 + 3] = (byte) (this.d >> 24);
-
-    return bytes;
+    return new byte[] {
+      (byte) this.a, (byte) (this.a >> 8), (byte) (this.a >> 16), (byte) (this.a >> 24),
+      (byte) this.b, (byte) (this.b >> 8), (byte) (this.b >> 16), (byte) (this.b >> 24),
+      (byte) this.c, (byte) (this.c >> 8), (byte) (this.c >> 16), (byte) (this.c >> 24),
+      (byte) this.d, (byte) (this.d >> 8), (byte) (this.d >> 16), (byte) (this.d >> 24)
+    };
   }
 
   public final AesBlock xor(final AesBlock other) {
-    var res = new AesBlock(this);
-    res.a ^= other.a;
-    res.b ^= other.b;
-    res.c ^= other.c;
-    res.d ^= other.d;
-
-    return res;
+    return new AesBlock(this.a ^ other.a, this.b ^ other.b, this.c ^ other.c, this.d ^ other.d);
   }
 
   public final AesBlock and(AesBlock other) {
-    var res = new AesBlock(this);
-    res.a &= other.a;
-    res.b &= other.b;
-    res.c &= other.c;
-    res.d &= other.d;
-
-    return res;
+    return new AesBlock(this.a & other.a, this.b & other.b, this.c & other.c, this.d & other.d);
   }
 
   public final AesBlock encrypt(final AesBlock round_key) {

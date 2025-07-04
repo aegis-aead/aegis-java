@@ -127,9 +127,7 @@ public class Aegis256 {
       i = 0;
       for (; i + 16 <= msg.length; i += 16) {
         var ci = this.enc(Arrays.copyOfRange(msg, i, i + 16));
-        for (var j = 0; j < 16; j++) {
-          ciphertext[i + j] = ci[j];
-        }
+        System.arraycopy(ci, 0, ciphertext, i, 16);
       }
       if (msg.length % 16 != 0) {
         var pad = new byte[16];
@@ -138,9 +136,7 @@ public class Aegis256 {
           pad[j] = msg[i + j];
         }
         var ci = this.enc(pad);
-        for (var j = 0; j < msg.length % 16; j++) {
-          ciphertext[i + j] = ci[j];
-        }
+        System.arraycopy(ci, 0, ciphertext, i, msg.length % 16);
       }
     }
     final var tag = this.mac(ad == null ? 0 : ad.length, msg == null ? 0 : msg.length);
@@ -151,12 +147,8 @@ public class Aegis256 {
   public byte[] encrypt(final byte[] msg, final byte[] ad) {
     var res = this.encryptDetached(msg, ad);
     var ciphertext = new byte[res.ct.length + res.tag.length];
-    for (var i = 0; i < res.ct.length; i++) {
-      ciphertext[i] = res.ct[i];
-    }
-    for (var i = 0; i < res.tag.length; i++) {
-      ciphertext[res.ct.length + i] = res.tag[i];
-    }
+    System.arraycopy(res.ct, 0, ciphertext, 0, res.ct.length);
+    System.arraycopy(res.tag, 0, ciphertext, res.ct.length, res.tag.length);
     return ciphertext;
   }
 
@@ -180,15 +172,11 @@ public class Aegis256 {
     i = 0;
     for (; i + 16 <= ac.ct.length; i += 16) {
       var xi = this.dec(Arrays.copyOfRange(ac.ct, i, i + 16));
-      for (var j = 0; j < 16; j++) {
-        msg[i + j] = xi[j];
-      }
+      System.arraycopy(xi, 0, msg, i, 16);
     }
     if (ac.ct.length % 16 != 0) {
       var xi = this.decLast(Arrays.copyOfRange(ac.ct, i, ac.ct.length));
-      for (var j = 0; j < ac.ct.length % 16; j++) {
-        msg[i + j] = xi[j];
-      }
+      System.arraycopy(xi, 0, msg, i, ac.ct.length % 16);
     }
     final var tag = this.mac(ad == null ? 0 : ad.length, msg == null ? 0 : msg.length);
     var dt = (byte) 0;
@@ -267,9 +255,7 @@ public class Aegis256 {
     }
     final var t = new AesBlock(pad);
     final var out_bytes = t.xor(z).toBytes();
-    for (var i = 0; i < 16; i++) {
-      pad[i] = out_bytes[i];
-    }
+    System.arraycopy(out_bytes, 0, pad, 0, 16);
     var xn = new byte[cn.length];
     for (var i = 0; i < cn.length; i++) {
       xn[i] = pad[i];
@@ -320,12 +306,8 @@ public class Aegis256 {
     var tag = new byte[32];
     final var t0 = s[0].xor(s[1]).xor(s[2]).toBytes();
     final var t1 = s[3].xor(s[4]).xor(s[5]).toBytes();
-    for (var i = 0; i < 16; i++) {
-      tag[i] = t0[i];
-    }
-    for (var i = 0; i < 16; i++) {
-      tag[16 + i] = t1[i];
-    }
+    System.arraycopy(t0, 0, tag, 0, 16);
+    System.arraycopy(t1, 0, tag, 16, 16);
 
     this.state = null;
 

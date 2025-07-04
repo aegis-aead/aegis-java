@@ -130,9 +130,7 @@ public class Aegis128L {
       i = 0;
       for (; i + 32 <= msg.length; i += 32) {
         var ci = this.enc(Arrays.copyOfRange(msg, i, i + 32));
-        for (var j = 0; j < 32; j++) {
-          ciphertext[i + j] = ci[j];
-        }
+        System.arraycopy(ci, 0, ciphertext, i, 32);
       }
       if (msg.length % 32 != 0) {
         var pad = new byte[32];
@@ -141,9 +139,7 @@ public class Aegis128L {
           pad[j] = msg[i + j];
         }
         var ci = this.enc(pad);
-        for (var j = 0; j < msg.length % 32; j++) {
-          ciphertext[i + j] = ci[j];
-        }
+        System.arraycopy(ci, 0, ciphertext, i, msg.length % 32);
       }
     }
     final var tag = this.mac(ad == null ? 0 : ad.length, msg == null ? 0 : msg.length);
@@ -161,12 +157,8 @@ public class Aegis128L {
   public byte[] encrypt(final byte[] msg, final byte[] ad) {
     var res = this.encryptDetached(msg, ad);
     var ciphertext = new byte[res.ct.length + res.tag.length];
-    for (var i = 0; i < res.ct.length; i++) {
-      ciphertext[i] = res.ct[i];
-    }
-    for (var i = 0; i < res.tag.length; i++) {
-      ciphertext[res.ct.length + i] = res.tag[i];
-    }
+    System.arraycopy(res.ct, 0, ciphertext, 0, res.ct.length);
+    System.arraycopy(res.tag, 0, ciphertext, res.ct.length, res.tag.length);
     return ciphertext;
   }
 
@@ -198,15 +190,11 @@ public class Aegis128L {
     i = 0;
     for (; i + 32 <= ac.ct.length; i += 32) {
       var xi = this.dec(Arrays.copyOfRange(ac.ct, i, i + 32));
-      for (var j = 0; j < 32; j++) {
-        msg[i + j] = xi[j];
-      }
+      System.arraycopy(xi, 0, msg, i, 32);
     }
     if (ac.ct.length % 32 != 0) {
       var xi = this.decLast(Arrays.copyOfRange(ac.ct, i, ac.ct.length));
-      for (var j = 0; j < ac.ct.length % 32; j++) {
-        msg[i + j] = xi[j];
-      }
+      System.arraycopy(xi, 0, msg, i, ac.ct.length % 32);
     }
     final var tag = this.mac(ad == null ? 0 : ad.length, msg == null ? 0 : msg.length);
     var dt = (byte) 0;
@@ -277,12 +265,8 @@ public class Aegis128L {
     final var out1_bytes = t1.xor(z1).toBytes();
     this.update(t0, t1);
     var ci = new byte[32];
-    for (var i = 0; i < 16; i++) {
-      ci[i] = out0_bytes[i];
-    }
-    for (var i = 0; i < 16; i++) {
-      ci[i + 16] = out1_bytes[i];
-    }
+    System.arraycopy(out0_bytes, 0, ci, 0, 16);
+    System.arraycopy(out1_bytes, 0, ci, 16, 16);
     return ci;
   }
 
@@ -299,12 +283,8 @@ public class Aegis128L {
     final var out0_bytes = out0.toBytes();
     final var out1_bytes = out1.toBytes();
     var xi = new byte[32];
-    for (var i = 0; i < 16; i++) {
-      xi[i] = out0_bytes[i];
-    }
-    for (var i = 0; i < 16; i++) {
-      xi[i + 16] = out1_bytes[i];
-    }
+    System.arraycopy(out0_bytes, 0, xi, 0, 16);
+    System.arraycopy(out1_bytes, 0, xi, 16, 16);
     return xi;
   }
 
@@ -322,12 +302,8 @@ public class Aegis128L {
     final var t1 = new AesBlock(Arrays.copyOfRange(pad, 16, 32));
     final var out0_bytes = t0.xor(z0).toBytes();
     final var out1_bytes = t1.xor(z1).toBytes();
-    for (var i = 0; i < 16; i++) {
-      pad[i] = out0_bytes[i];
-    }
-    for (var i = 0; i < 16; i++) {
-      pad[i + 16] = out1_bytes[i];
-    }
+    System.arraycopy(out0_bytes, 0, pad, 0, 16);
+    System.arraycopy(out1_bytes, 0, pad, 16, 16);
     var xn = new byte[cn.length];
     for (var i = 0; i < cn.length; i++) {
       xn[i] = pad[i];
@@ -379,12 +355,8 @@ public class Aegis128L {
     var tag = new byte[32];
     final var t0 = s[0].xor(s[1]).xor(s[2]).xor(s[3]).toBytes();
     final var t1 = s[4].xor(s[5]).xor(s[6]).xor(s[7]).toBytes();
-    for (var i = 0; i < 16; i++) {
-      tag[i] = t0[i];
-    }
-    for (var i = 0; i < 16; i++) {
-      tag[16 + i] = t1[i];
-    }
+    System.arraycopy(t0, 0, tag, 0, 16);
+    System.arraycopy(t1, 0, tag, 16, 16);
 
     this.state = null;
 
