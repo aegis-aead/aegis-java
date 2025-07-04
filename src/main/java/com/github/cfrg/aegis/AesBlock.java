@@ -1,6 +1,6 @@
 package com.github.cfrg.aegis;
 
-class AesBlock implements Cloneable {
+class AesBlock {
   static final int LUT0[] = {
     0xa56363c6, 0x847c7cf8, 0x997777ee, 0x8d7b7bf6, 0x0df2f2ff, 0xbd6b6bd6, 0xb16f6fde, 0x54c5c591,
         0x50303060,
@@ -243,15 +243,6 @@ class AesBlock implements Cloneable {
 
   protected int a, b, c, d;
 
-  public Object clone() {
-    Object dup = null;
-    try {
-      dup = super.clone();
-    } catch (CloneNotSupportedException err) {
-    }
-    return dup;
-  }
-
   public AesBlock(final byte bytes[]) {
     assert bytes.length == 16;
     this.a =
@@ -312,13 +303,6 @@ class AesBlock implements Cloneable {
     this.b ^= other.b;
     this.c ^= other.c;
     this.d ^= other.d;
-  }
-
-  public final void andInPlace(final AesBlock other) {
-    this.a &= other.a;
-    this.b &= other.b;
-    this.c &= other.c;
-    this.d &= other.d;
   }
 
   public final void copyFrom(final AesBlock other) {

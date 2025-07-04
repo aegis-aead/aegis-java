@@ -49,7 +49,6 @@ public class Aegis256 {
   private static final AesBlock C1 = new AesBlock(C1_BYTES);
 
   private final byte[] tempBuffer = new byte[16];
-  private final AesBlock tempBlock = new AesBlock(0, 0, 0, 0);
 
   /**
    * Generates a random 256-bit key using a secure random number generator.
